@@ -18,7 +18,7 @@ const device = {
     VKEY: process.env.VKEY,
 };
 
-const db = new sqlite.Database("./db/database.sqlite", (err) => {
+const db = new sqlite.Database("./db/db.sqlite", (err) => {
     if (err) {
         console.error("Error opening database");
     } else {
@@ -118,11 +118,36 @@ app.get("/getac", async (req, res) => {
     }
 });
 
+app.post('/register-user', async (req, res) => {
+    const {username} = req.body;
+
+    if (!username) {
+        return res.status(400).json({ message: "username is empty" });
+    }
+
+    const user = await getFromDB(
+        "SELECT username FROM users WHERE username=?",
+        [username],
+    );
+
+    if (user) {
+        return res.status(429).json({ message: "username already exist" })
+    }
+
+    const stmt = db.prepare("INSERT INTO users (username) VALUES(?)")
+    stmt.run(username, (err) => {
+        if (err) {
+            res.status(400).json({ message: `register failed: ${err}` })
+        } else {
+            res.status(201).json({ message: "user registered" })
+        }
+    })
+})
+
 app.get("/register", async (req, res) => {
     const { user_id } = req.query;
 
     if (!user_id) return res.status(400).send("Missing user_id parameter");
-
 
     const base_path = `${baseUrl}:${port}`;
     const response = `${user_id};${securityKey};${time_limit};${base_path}/process_register;${base_path}/getac`;
@@ -171,13 +196,14 @@ app.get("/verification", async (req, res) => {
     if (!user_id) return res.status(400).send("Missing user_id parameter");
 
     const data = await getUserFingers(user_id);
-
-    res.send(`${user_id};${data[0].finger_data};${securityKey};${time_limit};${baseUrl}/process_verification;${baseUrl}/getac;extraParams`);
+    const resp = `${user_id};${data[0]?.finger_data};${securityKey};${time_limit};${baseUrl}:${port}/process_verification;${baseUrl}:${port}/getac;`
+    
+    res.send(resp);
 });
 
 app.post('/process_verification', async (req, res) => {
     const { VerPas } = req.body
-
+    
     if (!VerPas) return res.status(400).send("missing VerPas parameter");
     const data = VerPas.split(";");
     const user_id = data[0];
@@ -185,20 +211,13 @@ app.post('/process_verification', async (req, res) => {
     const time = data[2];
     const sn = data[3];
 
-    const finger = getUserFingers(user_id);
+    const finger = await getUserFingers(user_id);
     const device = await getDeviceBySn();
 
-    const user = await getFromDB(
-        'SELECT * FROM users WHERE id=?',
-        [user_id],
-    );
-
-    const username = user.username;
-
-    const salt = hash(sn + finger[0].finger_data + device[0].vc + time + user_id + device[0].vkey);
+    const salt = hash(sn + finger[0]?.finger_data + device[0].vc + time + user_id + device[0].vkey);
 
     if (vStamp?.toUpperCase() === salt.toUpperCase()) {
-        res.send(`berhasil, user: ${username}`);
+        res.send(`berhasil`);
     } else {
         res.send(`failed`);
     }
