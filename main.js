@@ -146,6 +146,7 @@ app.post("/register-user", async (req, res) => {
 // route to register fingerprint and bind the user id to the fingerprint
 app.get("/register", async (req, res) => {
   const { user_id } = req.query;
+  console.log('user', user_id)
 
   if (!user_id) return res.status(400).send("Missing user_id parameter");
 
@@ -164,6 +165,8 @@ app.get("/register", async (req, res) => {
 // the data will be set to as RegTemp by fingerspot
 app.post("/process_register", async (req, res) => {
   const { RegTemp } = req.body;
+
+  console.log('dfasdfasdf', RegTemp)
 
   if (!RegTemp) return res.status(400).send("missing RegTemp parameter");
 
